@@ -9,6 +9,7 @@ from smac.acquisition.function.integrated_acquisition_function import (
 from smac.acquisition.function.prior_acqusition_function import PriorAcquisitionFunction
 from smac.acquisition.function.probability_improvement import PI
 from smac.acquisition.function.thompson import TS
+from smac.acquisition.function.multi_armed_bandit import MultiMAB, MAB
 
 __all__ = [
     "AbstractAcquisitionFunction",
@@ -19,4 +20,6 @@ __all__ = [
     "TS",
     "PriorAcquisitionFunction",
     "IntegratedAcquisitionFunction",
+    "MultiMAB",
+    "MAB",
 ]

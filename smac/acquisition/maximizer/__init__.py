@@ -8,6 +8,7 @@ from smac.acquisition.maximizer.local_and_random_search import (
 )
 from smac.acquisition.maximizer.local_search import LocalSearch
 from smac.acquisition.maximizer.random_search import RandomSearch
+from smac.acquisition.maximizer.multi_armed_bandit_maximizer import MultiMABMaximizer
 
 __all__ = [
     "AbstractAcquisitionMaximizer",
@@ -16,4 +17,5 @@ __all__ = [
     "LocalAndSortedPriorRandomSearch",
     "LocalSearch",
     "RandomSearch",
+    "MultiMABMaximizer",
 ]
