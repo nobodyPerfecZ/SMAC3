@@ -27,7 +27,7 @@ class TestMultiMAB(unittest.TestCase):
         )
         self.configurations = self.cs.sample_configuration(5)
         self.X = convert_configurations_to_array(self.configurations)
-        self.y = np.array([1, 1, 2, 2, 4])
+        self.y = np.array([1, 1, 2, 2, 4]).reshape(-1, 1)
 
         # Initialize the MultiMAB
         self.mabs = MultiMAB(
@@ -58,10 +58,10 @@ class TestMultiMAB(unittest.TestCase):
             self.mabs([self.configurations[0]])
 
             # Update the mab
-            self.mabs.update(model=self.model)
+            self.mabs.update(model=self.model, X=self.X, Y=self.y)
 
-        np.testing.assert_almost_equal(np.array([0.3274374, 0.0517379, 0.1637728, 0.0765191]), self.mabs[0]._weights)
-        np.testing.assert_almost_equal(np.array([0.1446989, 0.0442218, 0.0348696]), self.mabs[1]._weights)
+        np.testing.assert_almost_equal(np.array([0.4920554, 0.3815996, 0.1633308, 0.2753873]), self.mabs[0]._weights)
+        np.testing.assert_almost_equal(np.array([0.3262476, 0.181825, 0.1471832]), self.mabs[1]._weights)
 
     def test_call(self):
         """
@@ -98,7 +98,7 @@ class TestMAB(unittest.TestCase):
         )
         self.configurations = self.cs.sample_configuration(5)
         self.X = convert_configurations_to_array(self.configurations)
-        self.y = np.array([1, 1, 2, 2, 4])
+        self.y = np.array([1, 1, 2, 2, 4]).reshape(-1, 1)
 
         # Initialize the MAB
         self.mab = MAB(
@@ -144,8 +144,8 @@ class TestMAB(unittest.TestCase):
             self.mab([self.configurations[0]])
 
             # Update the mab
-            self.mab.update(model=self.model)
-        np.testing.assert_almost_equal(np.array([0.3274374, 0.0517379, 0.1637728, 0.0765191]), self.mab._weights)
+            self.mab.update(model=self.model, X=self.X, Y=self.y)
+        np.testing.assert_almost_equal(np.array([0.4920554, 0.3815996, 0.1633308, 0.2753873]), self.mab._weights)
 
     def test_call(self):
         """

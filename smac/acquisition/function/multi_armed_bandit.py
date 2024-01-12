@@ -6,13 +6,10 @@ from typing import Any, Iterator
 import numpy as np
 from ConfigSpace import Configuration, ConfigurationSpace
 from ConfigSpace.hyperparameters import CategoricalHyperparameter
+from sklearn.preprocessing import MinMaxScaler
 
-from smac.acquisition.function.abstract_acquisition_function import (
-    AbstractAcquisitionFunction,
-)
-from smac.model.gaussian_process.abstract_gaussian_process import (
-    AbstractGaussianProcess,
-)
+from smac.acquisition.function.abstract_acquisition_function import AbstractAcquisitionFunction
+from smac.model.abstract_model import AbstractModel
 from smac.utils.configspace import convert_configurations_to_array
 from smac.utils.logging import get_logger
 
@@ -55,9 +52,9 @@ class MultiMAB(AbstractAcquisitionFunction):
     def name(self) -> str:
         return "Multi-Multi-Armed Bandit"
 
-    def update(self, model: AbstractGaussianProcess, **kwargs: Any) -> None:
+    def update(self, model: AbstractModel, X: np.ndarray, Y: np.ndarray, **kwargs: Any) -> None:
         for mab in self._multi_mab:
-            mab.update(model=model, **kwargs)
+            mab.update(model=model, X=X, Y=Y, **kwargs)
 
     def get_hp_values(self, actions: np.ndarray) -> np.ndarray:
         """Returns the corresponding hyperparameter values, given the actions as indices for each hyperparameter value.
@@ -230,12 +227,6 @@ class MAB(AbstractAcquisitionFunction):
         probs = self._normalize(probs)
         return probs
 
-    def update(self, model: AbstractGaussianProcess, **kwargs: Any) -> None:
-        if not isinstance(model, AbstractGaussianProcess):
-            raise ValueError("MAB does only support GaussianProcesses as surrogate models!")
-        self.model = model
-        self._update(**kwargs)
-
     def _update(self, **kwargs: Any) -> None:
         if self._last_action == -1 and not self._first_time:
             # Case: last action was not set correctly
@@ -245,11 +236,12 @@ class MAB(AbstractAcquisitionFunction):
             )
             return
 
-        # Set first time to false
+        # Set first_time to False
         self._first_time = False
         
-        # Get the last observed y-values for the last actions
-        reward = self.model._gp.y_train_[-1]
+        # Perform a min-max normalization over the y-values
+        # Get the last observed y-values for the last action
+        reward = MinMaxScaler().fit_transform(self.Y)[-1].item()
 
         # Compute the estimated reward
         estimated_reward = reward / max(1e-10, self._prob[self._last_action])

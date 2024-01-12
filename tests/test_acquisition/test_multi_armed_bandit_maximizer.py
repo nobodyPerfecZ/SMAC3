@@ -28,7 +28,7 @@ class TestMultiMABMaximizer(unittest.TestCase):
         )
         self.configurations = self.cs.sample_configuration(5)
         self.X = convert_configurations_to_array(self.configurations)
-        self.y = np.array([1, 1, 2, 2, 4])
+        self.y = np.array([1, 1, 2, 2, 4]).reshape(-1, 1)
 
         # Initialize and train the model
         self.kernel = CoCaBOKernel(SimilarityKernel(), RBFKernel(), weight=0.5)
@@ -44,6 +44,8 @@ class TestMultiMABMaximizer(unittest.TestCase):
         self.ei = EI()
         self.ei._model = self.model
         self.ei._eta = 0
+        self.ei._X = self.X
+        self.ei._Y = self.y
 
         # Initialize the acquisition function maximizer
         self.mab_maximizer = MultiMABMaximizer(

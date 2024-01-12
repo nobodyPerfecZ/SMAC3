@@ -22,6 +22,8 @@ class AbstractAcquisitionFunction:
 
     def __init__(self) -> None:
         self._model: AbstractModel | None = None
+        self._X: np.ndarray | None = None
+        self._Y: np.ndarray | None = None
 
     @property
     def name(self) -> str:
@@ -44,13 +46,33 @@ class AbstractAcquisitionFunction:
     def model(self, model: AbstractModel) -> None:
         """Updates the surrogate model."""
         self._model = model
+        
+    @property
+    def X(self) -> np.ndarray | None:
+        """Returns the evaluated feature matrix."""
+        return self._X
 
-    def update(self, model: AbstractModel, **kwargs: Any) -> None:
+    @X.setter
+    def X(self, X: np.ndarray) -> None:
+        """Updates the evaluated feature matrix."""
+        self._X = X
+    
+    @property
+    def Y(self) -> np.ndarray | None:
+        """Returns the evaluated costs."""
+        return self._Y
+
+    @Y.setter
+    def Y(self, Y: np.ndarray) -> None:
+        """Updates the evaluated costs."""
+        self._Y = Y
+
+    def update(self, model: AbstractModel, X: np.ndarray, Y: np.ndarray, **kwargs: Any) -> None:
         """Update the acquisition function attributes required for calculation.
 
         This method will be called after fitting the model, but before maximizing the acquisition
         function. As an examples, EI uses it to update the current fmin. The default implementation only updates the
-        attributes of the acqusition function which are already present.
+        attributes of the acquisition function which are already present.
 
         Calls `_update` to update the acquisition function attributes.
 
@@ -58,14 +80,20 @@ class AbstractAcquisitionFunction:
         ----------
         model : AbstractModel
             The model which was used to fit the data.
+        X : np.ndarray
+            The already evaluated configurations as feature matrix
+        Y : np.ndarray
+            The costs of each evaluated configuration
         kwargs : Any
             Additional arguments to update the specific acquisition function.
         """
         self.model = model
+        self.X = X
+        self.Y = Y
         self._update(**kwargs)
 
     def _update(self, **kwargs: Any) -> None:
-        """Update acsquisition function attributes
+        """Update acquisition function attributes
 
         Might be different for each child class.
         """

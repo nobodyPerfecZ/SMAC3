@@ -3,12 +3,8 @@ from __future__ import annotations
 from ConfigSpace import Configuration, ConfigurationSpace
 
 from smac.acquisition.function import MultiMAB
-from smac.acquisition.maximizer.abstract_acqusition_maximizer import (
-    AbstractAcquisitionFunction,
-)
-from smac.acquisition.maximizer.abstract_acqusition_maximizer import (
-    AbstractAcquisitionMaximizer,
-)
+from smac.acquisition.maximizer.abstract_acqusition_maximizer import AbstractAcquisitionFunction
+from smac.acquisition.maximizer.abstract_acqusition_maximizer import AbstractAcquisitionMaximizer
 from smac.utils.logging import get_logger
 
 __copyright__ = "Copyright 2022, automl.org"
@@ -69,7 +65,11 @@ class MultiMABMaximizer(AbstractAcquisitionMaximizer):
         _sorted: bool = False,
     ) -> list[tuple[float, Configuration]]:
         # Update the Multi-Agent MAB
-        self._mabs.update(model=self.acquisition_function.model)
+        self._mabs.update(
+            model=self.acquisition_function.model,
+            X=self.acquisition_function.X,
+            Y=self.acquisition_function.Y
+        )
         
         # Select the next values for each categorical hyperparameter
         actions = self._mabs([self._configspace.sample_configuration()])
