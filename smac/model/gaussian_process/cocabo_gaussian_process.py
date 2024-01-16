@@ -91,7 +91,7 @@ class CoCaBOGaussianProcess(AbstractGaussianProcess):
         add_bound_priors: bool = True,
         add_soft_bounds: bool = False,
     ) -> list[list[AbstractPrior]]:
-        from model.gaussian_process.priors import SoftTopHatPrior, TophatPrior
+        from smac.model.gaussian_process.priors import SoftTopHatPrior, TophatPrior
         
         # Obtain a list of all priors for each tunable hyperparameter of the kernel
         all_priors = []
