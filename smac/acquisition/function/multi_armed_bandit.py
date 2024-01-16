@@ -38,19 +38,19 @@ class MultiMAB(AbstractAcquisitionFunction):
             configspace: ConfigurationSpace,
             gamma: float,
             seed: int,
-    ) -> None:
+    ):
         super(MultiMAB, self).__init__()
         self._configspace = configspace
 
         # Initialize the MABs
         self._multi_mab = [
-            MAB(index=i, K=len(hp.choices), gamma=gamma, seed=seed) for i, hp in enumerate(self._configspace.values())
-            if isinstance(hp, CategoricalHyperparameter)
+            MAB(index=i, K=len(hp.choices), gamma=gamma, seed=seed) 
+            for i, hp in enumerate(self._configspace.values()) if isinstance(hp, CategoricalHyperparameter)
         ]
 
     @property
     def name(self) -> str:
-        return "Multi-Multi-Armed Bandit"
+        return "Multi-MAB"
 
     def update(self, model: AbstractModel, X: np.ndarray, Y: np.ndarray, **kwargs: Any) -> None:
         for mab in self._multi_mab:
@@ -75,7 +75,7 @@ class MultiMAB(AbstractAcquisitionFunction):
         # Get the categorical values for each categorical hyperparameter
         hp_values = np.zeros(shape=(1, len(self._multi_mab)), dtype=object)
         for i, mab in enumerate(self._multi_mab):
-            hp = list(self._configspace.values())[mab._index]
+            hp = list(self._configspace.values())[mab.index]
             hp_values[0, i] = hp.choices[actions[0, i]]
         return hp_values
 
@@ -84,7 +84,7 @@ class MultiMAB(AbstractAcquisitionFunction):
             raise ValueError("MultiMAB only support __call__(...) with shape (1, N)!")
 
         # Get the indices of each MAB
-        indices = [mab._index for mab in self._multi_mab]
+        indices = [mab.index for mab in self._multi_mab]
 
         # Select only the categorical values of each MAB
         X = convert_configurations_to_array(configurations)[:, indices]
@@ -105,7 +105,7 @@ class MultiMAB(AbstractAcquisitionFunction):
             raise ValueError("MultiMAB only support _compute(...) with shape (1, NUM_MABS)!")
 
         # Sample for the given input
-        indices = np.zeros(shape=X.shape, dtype=int)
+        next_actions = np.zeros(shape=X.shape, dtype=int)
 
         # Sample for each mab
         for i, mab in enumerate(self._multi_mab):
@@ -117,9 +117,9 @@ class MultiMAB(AbstractAcquisitionFunction):
                 x = x[np.newaxis, :]
 
             # Sample the next action from the MAB
-            indices[:, i] = mab._compute(x)
+            next_actions[:, i] = mab._compute(x)
 
-        return indices
+        return next_actions
 
     def __getitem__(self, index: int) -> MAB:
         return self._multi_mab[index]
@@ -141,25 +141,31 @@ class MultiMAB(AbstractAcquisitionFunction):
 
 
 class MAB(AbstractAcquisitionFunction):
-    """Implementation of Multi-Armed Bandit Acquisition function. The Multi-Armed Bandit optimizes one categorical hyperparameter of
-        a configuration space by optimizing its sampling weights with the EXP3 algorithm.
-        
-        The implementation is based on the EXP3 algorithm:
-        https://jeremykun.com/2013/11/08/adversarial-bandits-and-the-exp3-algorithm/
+    """Implementation of Multi-Armed Bandit Acquisition function.
+    The Multi-Armed Bandit optimizes one categorical hyperparameter of a configuration space by optimizing its sampling
+    weights with the EXP3 algorithm.
 
-        Parameters
-        ----------
-        index : int
-            The index of the categorical hyperparameter
-        K : int
-            The number of values (choices) for the categorical hyperparameter
-        gamma : float
-            The factor to control exploration-exploitation in EXP3 for each MAB.
-            gamma == 1: Only Exploration, No Exploitation
-            gamma == 0: No Exploration, Only Exploitation 
-        seed : int
-            The seed for the random number generator
-        """
+    The implementation is based on the EXP3 algorithm:
+    https://jeremykun.com/2013/11/08/adversarial-bandits-and-the-exp3-algorithm/
+
+    Because the EXP3 algorithm is designed for maximization problems and to handle rewards in range [0, 1], our
+    algorithm does two extensions to apply it for minimization problems.
+    1. It does a min-max normalization over the entire dataset (X, y) of the model to range the values inside [0, 1]
+    2. Multiply -1 to the rewards to convert it to a maximization problem
+
+    Parameters
+    ----------
+    index : int
+        The index of the categorical hyperparameter (from the configuration space)
+    K : int
+        The number of values (choices) for the categorical hyperparameter
+    gamma : float
+        The factor to control exploration-exploitation in EXP3 for each MAB.
+        gamma == 1: Only Exploration, No Exploitation
+        gamma == 0: No Exploration, Only Exploitation 
+    seed : int
+        The seed for the random number generator
+    """
 
     def __init__(self, index: int, K: int, gamma: float, seed: int):
         super(MAB, self).__init__()
@@ -168,7 +174,8 @@ class MAB(AbstractAcquisitionFunction):
         self._gamma = gamma
         self._rng = np.random.RandomState(seed)
 
-        # Initialize the uniform wights
+        # EXP3:
+        # 1. Initialize the weights w_i(1) = 1 for i = 1, ..., K
         self._weights = np.array([1.0 for _ in range(K)])
 
         # Initialize the last action
@@ -190,46 +197,44 @@ class MAB(AbstractAcquisitionFunction):
         )
         return meta
 
-    def _normalize(self, weights: np.ndarray, axis: int = 0) -> np.ndarray:
-        """Normalizes the given weight vector/matrix into a probability distribution.
+    @property
+    def index(self) -> int:
+        """Returns the index of the categorical hyperparameter."""
+        return self._index
 
-            Parameters
-            ----------
-            weights : np.ndarray [N,]
-                The weight vector we want to normalize
-            
-            axis : int
-                The axis where we want to compute the probability distribution
+    def _normalize_weights(self) -> np.ndarray:
+        """Normalizes the weight vector into a probability distribution.
 
-            Returns
-            -------
-            np.ndarray [N,]
-                The (normalized) probability distribution along the given axis
-            """
-        return weights / np.sum(weights, axis=axis)
+        Returns
+        -------
+        np.ndarray [N,]
+            The (normalized) probability distribution along the given axis
+        """
+        return self._weights / np.sum(self._weights)
 
     @property
     def _prob(self) -> np.ndarray:
-        """The probability distribution p(t)=[p_1(t), ..., p_K(t)] according to EXP3 algorithm.
+        """Computes the probability distribution p_i(t) according to the EXP3 algorithm.
+        
+        The probability distribution is computed by the following formula:
+        p_i(t) = (1 - gamma) * w_i(t) / sum_j=1^K w_j(t) + gamma / K
 
-            Returns
-            -------
-            np.ndarray [N,] or [N, D]
-                The probability distribution p(t) with the EXP3 algorithm
-            """
-        # Normalize the weights to a probability distribution
-        probs = self._normalize(self._weights)
+        Returns
+        -------
+        np.ndarray [N,]
+            The probability distribution p(t)=[p_1(t), p_2(t), ...]
+        """
+        # Normalize the weights to a probability distribution w_i(t) / sum_j=1^K w_j(t)
+        weights = self._normalize_weights()
 
-        # Shift p(t) according to the EXP3 algorithm
-        probs = (1 - self._gamma) * probs + (self._gamma / self._K)
+        # Compute the probability distribution  p_i(t) = (1 - gamma) * w_i(t) / sum_j=1^K w_j(t) + gamma / K
+        probs = (1 - self._gamma) * weights + (self._gamma / self._K)
 
-        # Apply normalization of the probabilities
-        probs = self._normalize(probs)
         return probs
 
     def _update(self, **kwargs: Any) -> None:
         if self._last_action == -1 and not self._first_time:
-            # Case: last action was not set correctly
+            # Case: Last actions was not set correctly (and it is not the first time)
             warnings.warn(
                 "Use __call__(...) to set the last action before updating the weights of the MAB!",
                 UserWarning
@@ -238,17 +243,22 @@ class MAB(AbstractAcquisitionFunction):
 
         # Set first_time to False
         self._first_time = False
-        
-        # Perform a min-max normalization over the y-values
-        # Get the last observed y-values for the last action
+
+        # EXP3:
+        # 2.3. Observe reward x_i_t(t)
+        # Because the range of the value can be [-inf, +inf] we perform a min-max normalization to scale it to [0, 1]
         reward = MinMaxScaler().fit_transform(self.Y)[-1].item()
 
-        # Compute the estimated reward
+        # EXP3:
+        # 2.4. Define the estimated reward x^_i_t(t) = x_i_t(t) / p_i_t(t)
         estimated_reward = reward / max(1e-10, self._prob[self._last_action])
 
-        # Update the weight of the last action taken after the EXP3 algorithm
-        self._weights[self._last_action] = self._weights[self._last_action] * np.exp(
-            -self._gamma * estimated_reward / self._K)
+        # EXP3:
+        # 2.5.: Update weights w_i_t(t+1) = w_i_t(t) * exp(gamma * x^_i_t(t) / K)
+        # Because we have a minimization problem we use -x^_i_t(t) for the update
+        self._weights[self._last_action] = (
+                self._weights[self._last_action] * np.exp(-self._gamma * estimated_reward / self._K)
+        )
 
     def __call__(self, configurations: list[Configuration]) -> np.ndarray:
         if len(configurations) != 1:
@@ -273,14 +283,14 @@ class MAB(AbstractAcquisitionFunction):
         if X.shape != (1, 1):
             raise ValueError("MAB only support _compute(...) with shape (1, 1)!")
 
-        # Sample a choice of the categorical value as index
-        test = self._normalize(self._weights)
-        index = self._rng.choice(self._K, size=X.shape[0], p=test)#  p=self._prob)
+        # EXP3:
+        # 2.2 Draw the next action i_t (as index) according to the distribution of p_i(t)
+        next_action = self._rng.choice(self._K, size=X.shape[0], p=self._prob)
 
         # Update last action to the current index
-        self._last_action = index.item()
+        self._last_action = next_action.item()
 
-        return index
+        return next_action
 
     def __str__(self) -> str:
         return f"MAB(index={self._index}, K={self._K}, gamma={self._gamma}, weights={self._weights})"

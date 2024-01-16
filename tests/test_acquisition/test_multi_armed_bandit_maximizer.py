@@ -67,7 +67,7 @@ class TestMultiMABMaximizer(unittest.TestCase):
         )
 
         # Check if all configurations has the same value for categorical hyperparameters
-        self.assertTrue(all(cfg["C"] == "c2" for _, cfg in configurations))
+        self.assertTrue(all(cfg["C"] == "c3" for _, cfg in configurations))
         self.assertTrue(all(cfg["D"] == "d2" for _, cfg in configurations))
 
     def test_maximize_sorted(self):
@@ -82,7 +82,7 @@ class TestMultiMABMaximizer(unittest.TestCase):
         )
 
         # Check if all configurations has the same value for categorical hyperparameters
-        self.assertTrue(all(cfg["C"] == "c2" for _, cfg in configurations))
+        self.assertTrue(all(cfg["C"] == "c3" for _, cfg in configurations))
         self.assertTrue(all(cfg["D"] == "d2" for _, cfg in configurations))
 
         # Check if the acquisition function values are in descending order

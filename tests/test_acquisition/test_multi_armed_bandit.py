@@ -60,8 +60,8 @@ class TestMultiMAB(unittest.TestCase):
             # Update the mab
             self.mabs.update(model=self.model, X=self.X, Y=self.y)
 
-        np.testing.assert_almost_equal(np.array([0.4920554, 0.3815996, 0.1633308, 0.2753873]), self.mabs[0]._weights)
-        np.testing.assert_almost_equal(np.array([0.3262476, 0.181825, 0.1471832]), self.mabs[1]._weights)
+        np.testing.assert_almost_equal(np.array([0.7385973, 0.2059689, 0.0737037, 0.4592286]), self.mabs[0]._weights)
+        np.testing.assert_almost_equal(np.array([0.504676 , 0.0903069, 0.1378248]), self.mabs[1]._weights)
 
     def test_call(self):
         """
@@ -82,7 +82,6 @@ class TestMultiMAB(unittest.TestCase):
 # --------------------------------------------------------------
 # Test MAB
 # --------------------------------------------------------------
-
 class TestMAB(unittest.TestCase):
 
     def setUp(self):
@@ -117,13 +116,12 @@ class TestMAB(unittest.TestCase):
             seed=0,
         )
 
-    def test_normalize(self):
+    def test_normalize_weights(self):
         """
-        Tests the method normalize().
+        Tests the method normalize_weights().
         """
-        weights = [1.0, 1.0, 1.0]
-        normalized_weights = self.mab._normalize(weights)
-        np.testing.assert_almost_equal(np.array([0.3333333, 0.3333333, 0.3333333]), normalized_weights)
+        normalized_weights = self.mab._normalize_weights()
+        np.testing.assert_almost_equal(np.array([0.25, 0.25, 0.25, 0.25]), normalized_weights)
 
     def test_prob(self):
         """
@@ -145,7 +143,7 @@ class TestMAB(unittest.TestCase):
 
             # Update the mab
             self.mab.update(model=self.model, X=self.X, Y=self.y)
-        np.testing.assert_almost_equal(np.array([0.4920554, 0.3815996, 0.1633308, 0.2753873]), self.mab._weights)
+        np.testing.assert_almost_equal(np.array([0.7385973, 0.2059689, 0.0737037, 0.4592286]), self.mab._weights)
 
     def test_call(self):
         """
