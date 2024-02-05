@@ -5,8 +5,10 @@ from typing import Any
 from ConfigSpace import Configuration, ConfigurationSpace
 
 from smac.acquisition.function import MultiMAB
-from smac.acquisition.maximizer.abstract_acqusition_maximizer import AbstractAcquisitionFunction
-from smac.acquisition.maximizer.abstract_acqusition_maximizer import AbstractAcquisitionMaximizer
+from smac.acquisition.maximizer.abstract_acqusition_maximizer import (
+    AbstractAcquisitionFunction,
+    AbstractAcquisitionMaximizer
+)
 from smac.acquisition.maximizer.random_search import RandomSearch
 from smac.utils.logging import get_logger
 
@@ -27,11 +29,11 @@ class MultiMABMaximizer(AbstractAcquisitionMaximizer):
     acquisition_function : AbstractAcquisitionFunction
         The acquisition function for the predicting the performance of the continuous hyperparameters
     gamma : float
-        The factor to control exploration-exploitation in EXP3 for the Multi-Agent MAB.
-        gamma == 1: Only Exploration, No Exploitation
-        gamma == 0: No Exploration, Only Exploitation
+        The factor to control exploration-exploitation in EXP3 for the Multi-Agent MAB
+        If gamma == 1: Only Exploration, No Exploitation
+        If gamma == 0: No Exploration, Only Exploitation
     challengers : int
-        The number of configurations to be evaluated by the acquisition function.
+        The number of configurations to be evaluated by the acquisition function
     seed : int
         The random seed for the Multi-Agent MAB
     """
@@ -90,22 +92,7 @@ class MultiMABMaximizer(AbstractAcquisitionMaximizer):
         previous_configs: list[Configuration],
         n_points: int,
         _sorted: bool = False,
-    ) -> list[tuple[float, Configuration]]:
-        # Update the Multi-Agent MAB
-        self._mabs.update(
-            model=self.acquisition_function.model,
-            X=self.acquisition_function.X,
-            Y=self.acquisition_function.Y
-        )
-        
-        # Select the next values for each categorical hyperparameter
-        next_actions = self._mabs([self._configspace.sample_configuration()])
-        hp_values = self._mabs.get_hp_values(next_actions)
-        
-        # Get the categorical hyperparameter names from the configuration space
-        hp_names = list(self._configspace.keys())
-        hp_names = [hp_names[mab.index] for mab in self._mabs]
-        
+    ) -> list[tuple[float, Configuration]]:    
         # Get configurations from random search
         next_configs_by_random_search = self._random_search._maximize(
             previous_configs=previous_configs,
@@ -114,20 +101,39 @@ class MultiMABMaximizer(AbstractAcquisitionMaximizer):
         )
         next_configs_by_random_search = [cfg for _, cfg in next_configs_by_random_search]
         
-        # Replace the categorical hyperparameter with the MAB ones
-        for cfg in next_configs_by_random_search:
-            for i, name in enumerate(hp_names):
-                cfg[name] = hp_values[0][i]
+        if self._mabs:
+            # Case: No categorical hyperparameter available in the configuration space
+            # Update the Multi-Agent MAB
+            self._mabs.update(
+                model=self.acquisition_function.model,
+                X=self.acquisition_function.X,
+                Y=self.acquisition_function.Y
+            )
+
+            # Select the next values for each categorical hyperparameter
+            next_actions = self._mabs([self._configspace.sample_configuration()])
+            hp_values = self._mabs.get_hp_values(next_actions)
+            
+            # Get the categorical hyperparameter names from the configuration space
+            hp_names = list(self._configspace.keys())
+            hp_names = [hp_names[mab.index] for mab in self._mabs]
+
+            # Replace the categorical hyperparameter with the MAB ones
+            for cfg in next_configs_by_random_search:
+                for i, name in enumerate(hp_names):
+                    cfg[name] = hp_values[0][i]
 
         if _sorted:
             # Case: Sort them by the acquisition function values
             for i in range(len(next_configs_by_random_search)):
-                next_configs_by_random_search[i].origin = "Acquisition Function Maximizer: Multi-MAB + Random Search (sorted)"
+                next_configs_by_random_search[i].origin = \
+                    "Acquisition Function Maximizer: Multi-MAB + Random Search (sorted)"
 
             return self._sort_by_acquisition_value(next_configs_by_random_search)
         else:
             # Case: Do not sort them by the acquisition function values
             for i in range(len(next_configs_by_random_search)):
-                next_configs_by_random_search[i].origin = "Acquisition Function Maximizer: Multi-MAB + Random Search"
+                next_configs_by_random_search[i].origin = \
+                    "Acquisition Function Maximizer: Multi-MAB + Random Search"
 
             return [(0, next_configs_by_random_search[i]) for i in range(len(next_configs_by_random_search))]

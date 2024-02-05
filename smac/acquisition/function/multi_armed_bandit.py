@@ -17,7 +17,8 @@ logger = get_logger(__name__)
 
 
 class MultiMAB(AbstractAcquisitionFunction):
-    """Implementation of Multi-Agent Multi-Armed Bandit Acquisition function. The MultiMAB optimizes all categorical
+    """
+    Implementation of Multi-Agent Multi-Armed Bandit Acquisition function. The MultiMAB optimizes all categorical
     hyperparameters of a configuration space by using for each categorical hyperparameter a separate MAB and optimizing
     its weights with the EXP3 algorithm.
 
@@ -26,9 +27,9 @@ class MultiMAB(AbstractAcquisitionFunction):
     configspace : ConfigurationSpace
         The configuration space where we contain categorical, continuous hyperparameters
     gamma : float
-        The factor to control exploration-exploitation in EXP3 for each MAB.
-        gamma == 1: Only Exploration, No Exploitation
-        gamma == 0: No Exploration, Only Exploitation 
+        The factor to control exploration-exploitation in EXP3 for each MAB
+        If gamma == 1: Only Exploration, No Exploitation
+        If gamma == 0: No Exploration, Only Exploitation
     seed : int
         The random seed for each MAB
     """
@@ -121,6 +122,9 @@ class MultiMAB(AbstractAcquisitionFunction):
 
         return next_actions
 
+    def __len__(self) -> int:
+        return len(self._multi_mab)
+
     def __getitem__(self, index: int) -> MAB:
         return self._multi_mab[index]
 
@@ -141,7 +145,9 @@ class MultiMAB(AbstractAcquisitionFunction):
 
 
 class MAB(AbstractAcquisitionFunction):
-    """Implementation of Multi-Armed Bandit Acquisition function.
+    """
+    Implementation of Multi-Armed Bandit Acquisition function.
+    
     The Multi-Armed Bandit optimizes one categorical hyperparameter of a configuration space by optimizing its sampling
     weights with the EXP3 algorithm.
 
@@ -160,9 +166,9 @@ class MAB(AbstractAcquisitionFunction):
     K : int
         The number of values (choices) for the categorical hyperparameter
     gamma : float
-        The factor to control exploration-exploitation in EXP3 for each MAB.
-        gamma == 1: Only Exploration, No Exploitation
-        gamma == 0: No Exploration, Only Exploitation 
+        The factor to control exploration-exploitation in EXP3 for each MAB
+        If gamma == 1: Only Exploration, No Exploitation
+        If gamma == 0: No Exploration, Only Exploitation
     seed : int
         The seed for the random number generator
     """
@@ -203,7 +209,8 @@ class MAB(AbstractAcquisitionFunction):
         return self._index
 
     def _normalize_weights(self) -> np.ndarray:
-        """Normalizes the weight vector into a probability distribution.
+        """
+        Normalizes the weight vector into a probability distribution.
 
         Returns
         -------
@@ -214,7 +221,8 @@ class MAB(AbstractAcquisitionFunction):
 
     @property
     def _prob(self) -> np.ndarray:
-        """Computes the probability distribution p_i(t) according to the EXP3 algorithm.
+        """
+        Computes the probability distribution p_i(t) according to the EXP3 algorithm.
         
         The probability distribution is computed by the following formula:
         p_i(t) = (1 - gamma) * w_i(t) / sum_j=1^K w_j(t) + gamma / K
