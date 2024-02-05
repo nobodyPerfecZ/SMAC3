@@ -5,7 +5,7 @@ from typing import Any, Iterator
 
 import numpy as np
 from ConfigSpace import Configuration, ConfigurationSpace
-from ConfigSpace.hyperparameters import CategoricalHyperparameter
+from ConfigSpace.hyperparameters import CategoricalHyperparameter, OrdinalHyperparameter
 from sklearn.preprocessing import MinMaxScaler
 
 from smac.acquisition.function.abstract_acquisition_function import AbstractAcquisitionFunction
@@ -44,10 +44,12 @@ class MultiMAB(AbstractAcquisitionFunction):
         self._configspace = configspace
 
         # Initialize the MABs
-        self._multi_mab = [
-            MAB(index=i, K=len(hp.choices), gamma=gamma, seed=seed) 
-            for i, hp in enumerate(self._configspace.values()) if isinstance(hp, CategoricalHyperparameter)
-        ]
+        self._multi_mab = []
+        for i, hp in enumerate(self._configspace.values()):
+            if isinstance(hp, CategoricalHyperparameter):
+                self._multi_mab.append(MAB(index=i, K=len(hp.choices), gamma=gamma, seed=seed))
+            elif isinstance(hp, OrdinalHyperparameter):
+                self._multi_mab.append(MAB(index=i, K=len(hp.sequence), gamma=gamma, seed=seed))
 
     @property
     def name(self) -> str:
@@ -77,7 +79,10 @@ class MultiMAB(AbstractAcquisitionFunction):
         hp_values = np.zeros(shape=(1, len(self._multi_mab)), dtype=object)
         for i, mab in enumerate(self._multi_mab):
             hp = list(self._configspace.values())[mab.index]
-            hp_values[0, i] = hp.choices[actions[0, i]]
+            if isinstance(hp, OrdinalHyperparameter):
+                hp_values[0, i] = hp.sequence[actions[0, i]]
+            elif isinstance(hp, CategoricalHyperparameter):
+                hp_values[0, i] = hp.choices[actions[0, i]]
         return hp_values
 
     def __call__(self, configurations: list[Configuration]) -> np.ndarray:
