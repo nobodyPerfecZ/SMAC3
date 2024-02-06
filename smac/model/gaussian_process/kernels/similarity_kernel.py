@@ -8,27 +8,28 @@ from smac.model.gaussian_process.priors.abstract_prior import AbstractPrior
 
 
 class SimilarityKernel(AbstractKernel, kernels.Kernel):
-    """Indicator-based similarity kernel for categorical features.
+    """
+    Indicator-based similarity kernel for categorical features.
     
-        The Implementation is based on the paper "Bayesian Optimisation over Multiple Continuous and Categorical Inputs"
-        (Section 5.2): https://arxiv.org/pdf/1906.08878.pdf.
+    The Implementation is based on the paper "Bayesian Optimisation over Multiple Continuous and Categorical Inputs"
+    (Section 5.2): https://arxiv.org/pdf/1906.08878.pdf.
         
-        The formula of the SimilarityKernel is:
-                - K(h,h') = sigma / c * sum_i=1^c I(h_i - h'_i)
+    The formula of the SimilarityKernel is:
+        - K(h,h') = sigma / c * sum_i=1^c I(h_i - h'_i)
         
-        Parameters
-        ----------
-        noise_level : float
-            The sigma in the kernel formula
-        noise_level_bounds: tuple[float, float] | list[tuple[float, float]]
-            The range of possible values for noise_level
-        operate_on : np.ndarray
-            On which numpy array should be operated on.
-        has_conditions : bool
-            Whether the kernel has conditions.
-        prior : AbstractPrior
-            Which prior the kernel is using.
-        """
+    Parameters
+    ----------
+    noise_level : float
+        The sigma in the kernel formula
+    noise_level_bounds: tuple[float, float] | list[tuple[float, float]]
+        The range of possible values for noise_level
+    operate_on : np.ndarray
+        On which numpy array should be operated on
+    has_conditions : bool
+        Whether the kernel has conditions
+    prior : AbstractPrior
+        Which prior the kernel is using
+    """
 
     def __init__(
             self,
@@ -37,7 +38,7 @@ class SimilarityKernel(AbstractKernel, kernels.Kernel):
             operate_on: np.ndarray | None = None,
             has_conditions: bool = False,
             prior: AbstractPrior | None = None,
-    ) -> None:
+    ):
         self.noise_level = noise_level
         self.noise_level_bounds = noise_level_bounds
 
@@ -48,7 +49,7 @@ class SimilarityKernel(AbstractKernel, kernels.Kernel):
         )
 
     @property
-    def hyperparameter_noise_level(self):
+    def hyperparameter_noise_level(self) -> kernels.Hyperparameter:
         return kernels.Hyperparameter("noise_level", "numeric", self.noise_level_bounds)
 
     def diag(self, X: np.ndarray) -> np.ndarray:
@@ -88,7 +89,7 @@ class SimilarityKernel(AbstractKernel, kernels.Kernel):
                 return K, np.empty(shape=(X.shape[0], X.shape[0], self.n_dims))
         return K
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "{0}(noise_level={1:.3g})".format(
             self.__class__.__name__, np.ravel(self.noise_level)[0]
         )

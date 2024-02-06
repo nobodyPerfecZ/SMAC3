@@ -27,7 +27,7 @@ class CoCaBOKernel(AbstractKernel, kernels.KernelOperator):
     Parameters
     ----------
     k1 : kernels.Kernel
-        The kernel k_h(h) for the categorical features 
+        The kernel k_h(h) for the categorical features
     k2 : kernels.Kernel
         The kernel k_x(x) for the continuous features
     weight : float
@@ -35,24 +35,25 @@ class CoCaBOKernel(AbstractKernel, kernels.KernelOperator):
     weight_bounds : tuple[float, float] | list[tuple[float, float]]
         The range of the weight parameter
     operate_on : np.ndarray
-        On which numpy array should be operated on.
+        On which numpy array should be operated on
     has_conditions : bool
-        Whether the kernel has conditions.
+        Whether the kernel has conditions
     prior : AbstractPrior
-        Which prior the kernel is using.
+        Which prior the kernel is using
     """
 
     def __init__(
             self,
             k1: kernels.Kernel = SimilarityKernel(),
             k2: kernels.Kernel = RBFKernel(),
-            weight: float = 0.0,
-            weight_bounds: tuple[float, float] | list[tuple[float, float]] = (1.0, np.e),
+            weight: float = np.exp(0.5),
+            weight_bounds: tuple[float, float] | list[tuple[float, float]] = (1.0, np.exp(1.0)),
             operate_on: np.ndarray | None = None,
             has_conditions: bool = False,
             prior: AbstractPrior | None = None,
     ) -> None:
         self.weight = weight
+        self.log_weight = np.log(weight)
         self.weight_bounds = weight_bounds
         self.has_conditions = has_conditions
         self.operate_on = operate_on
@@ -66,11 +67,11 @@ class CoCaBOKernel(AbstractKernel, kernels.KernelOperator):
         )
 
     @property
-    def hyperparameter_weight(self):
+    def hyperparameter_weight(self) -> kernels.Hyperparameter:
         return kernels.Hyperparameter("weight", "numeric", self.weight_bounds)
 
     @property
-    def hyperparameters(self):
+    def hyperparameters(self) -> list[kernels.Hyperparameter]:
         r = [kernels.Hyperparameter(
             self.hyperparameter_weight.name,
             self.hyperparameter_weight.value_type,
@@ -98,18 +99,19 @@ class CoCaBOKernel(AbstractKernel, kernels.KernelOperator):
         return r
 
     @property
-    def theta(self):
-        return np.append(np.array(self.weight), [self.k1.theta, self.k2.theta])
+    def theta(self) -> np.ndarray:
+        return np.append(np.array(self.log_weight), [self.k1.theta, self.k2.theta])
 
     @theta.setter
-    def theta(self, theta):
+    def theta(self, theta: np.ndarray) -> None:
         k1_dims = self.k1.n_dims
-        self.weight = theta[0]
+        self.log_weight = theta[0]
+        self.weight = np.exp(theta[0])
         self.k1.theta = theta[1:k1_dims + 1]
         self.k2.theta = theta[k1_dims + 1:]
 
     @property
-    def bounds(self):
+    def bounds(self) -> np.ndarray:
         return super(kernels.KernelOperator, self).bounds
 
     def _separate_X(self, X: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -143,7 +145,7 @@ class CoCaBOKernel(AbstractKernel, kernels.KernelOperator):
         X_continuous = X[:, ~categorical_columns].astype(float)
         return X_categorical, X_continuous
     
-    def get_params(self, deep=True):
+    def get_params(self, deep=True) -> dict:
         params = super(AbstractKernel, self).get_params(deep)
 
         # Append own params
@@ -165,7 +167,7 @@ class CoCaBOKernel(AbstractKernel, kernels.KernelOperator):
             # Compute the combined diagonal
             K1 = self.k1.diag(X_categorical)
             K2 = self.k2.diag(X_continuous)
-            return self.weight * K1 * K2 + (1 - self.weight) * (K1 + K2)
+            return self.log_weight * K1 * K2 + (1 - self.log_weight) * (K1 + K2)
         elif X_categorical.size != 0:
             # Case: Only categorical features are available
             return self.k1.diag(X_categorical)
@@ -196,7 +198,7 @@ class CoCaBOKernel(AbstractKernel, kernels.KernelOperator):
                 # Case: Categorical and continuous features are available 
                 K1, K1_grad = self.k1(X_categorical, eval_gradient=True)
                 K2, K2_grad = self.k2(X_continuous, eval_gradient=True)
-                K = self.weight * K1 * K2 + (1 - self.weight) * (K1 + K2)
+                K = self.log_weight * K1 * K2 + (1 - self.log_weight) * (K1 + K2)
             elif X_categorical.size != 0:
                 # Case: Only categorical features are available
                 K1, K1_grad = self.k1(X_categorical, eval_gradient=True)
@@ -213,7 +215,7 @@ class CoCaBOKernel(AbstractKernel, kernels.KernelOperator):
                 # Case: Categorical and continuous features are available 
                 K1 = self.k1(X_categorical, Y_categorical, eval_gradient=False)
                 K2 = self.k2(X_continuous, Y_continuous, eval_gradient=False)
-                K = self.weight * K1 * K2 + (1 - self.weight) * (K1 + K2)
+                K = self.log_weight * K1 * K2 + (1 - self.log_weight) * (K1 + K2)
             elif X_categorical.size != 0:
                 # Case: Only categorical features are available
                 K = self.k1(X_categorical, Y_categorical, eval_gradient=False)
@@ -236,10 +238,10 @@ class CoCaBOKernel(AbstractKernel, kernels.KernelOperator):
                     K_grad_weight = (-(K1 + K2) + K1 * K2)[:, :, np.newaxis]
                     
                     # Compute the gradients dkz/dtheta_h (formula 15 in the paper)
-                    K_grad_h = (1 - self.weight) * K1_grad + self.weight * K2_ext * K1_grad
+                    K_grad_h = (1 - self.log_weight) * K1_grad + self.log_weight * K2_ext * K1_grad
                     
                     # Compute the gradients dkz/dtheta_h (formula 16 in the paper)
-                    K_grad_x = (1 - self.weight) * K2_grad + self.weight * K1_ext * K2_grad
+                    K_grad_x = (1 - self.log_weight) * K2_grad + self.log_weight * K1_ext * K2_grad
                 elif X_categorical.size != 0:
                     # Case: Only categorical features are available
                     # Compute the gradients dkz/weight (becomes zero in this case)

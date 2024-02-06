@@ -3,18 +3,36 @@ import unittest
 import numpy as np
 from ConfigSpace import ConfigurationSpace
 
-from smac.model.gaussian_process.kernels import CoCaBOKernel, SimilarityKernel, RBFKernel
+from smac.model.gaussian_process.kernels import (
+    CoCaBOKernel,
+    SimilarityKernel,
+    RBFKernel
+)
 from smac.utils.configspace import convert_configurations_to_array
 
 
-# --------------------------------------------------------------
-# Test CoCaBOKernel
-# --------------------------------------------------------------
 class TestCoCaBOKernel(unittest.TestCase):
+    """
+    Tests the class CoCaBOKernel.
+    """
 
     def setUp(self):
-        self.weight = 0.5
-        self.kernel = CoCaBOKernel(k1=SimilarityKernel(), k2=RBFKernel(), weight=self.weight)
+        self.weight = np.exp(0.5)
+        self.weight_bounds = (1, np.exp(1))
+
+        self.noise_level = 1.0
+        self.noise_level_bounds = (1e-5, 1e5)
+
+        self.length_scale = 1.0
+        self.length_scale_bounds = (1e-5, 1e5)
+
+        self.kernel = CoCaBOKernel(
+            k1=SimilarityKernel(noise_level=self.noise_level, noise_level_bounds=self.noise_level_bounds),
+            k2=RBFKernel(length_scale=self.length_scale, length_scale_bounds=self.length_scale_bounds),
+            weight=self.weight,
+            weight_bounds=self.weight_bounds,
+        )
+
         self.mixed_cs = ConfigurationSpace(
             space={
                 "A": (0.1, 1.5),
@@ -44,6 +62,54 @@ class TestCoCaBOKernel(unittest.TestCase):
         )
         self.continuous_X = convert_configurations_to_array(self.continuous_cs.sample_configuration(5))
 
+    def test_hyperparameter_weight(self):
+        """
+        Tests the property hyperparameter_weight.
+        """
+        self.assertEqual("weight", self.kernel.hyperparameter_weight.name)
+        np.testing.assert_almost_equal(np.array([[1, np.e]]), self.kernel.hyperparameter_weight.bounds)
+        self.assertEqual("numeric", self.kernel.hyperparameter_weight.value_type)
+
+    def test_hyperparameters(self):
+        """
+        Tests the property hyperparameters.
+        """
+        # Extract the hyperparameters of the CoCaBO kernel
+        cocabo_hp, k1_hp, k2_hp = self.kernel.hyperparameters
+
+        self.assertEqual("weight", cocabo_hp.name)
+        np.testing.assert_almost_equal(np.array([[1, np.e]]), cocabo_hp.bounds)
+        self.assertEqual("numeric", cocabo_hp.value_type)
+
+        self.assertEqual("k1__noise_level", k1_hp.name)
+        np.testing.assert_almost_equal(np.array([[1e-05, 1e05]]), k1_hp.bounds)
+        self.assertEqual("numeric", k1_hp.value_type)
+
+        self.assertEqual("k2__length_scale", k2_hp.name)
+        np.testing.assert_almost_equal(np.array([[1e-05, 1e05]]), k2_hp.bounds)
+        self.assertEqual("numeric", k2_hp.value_type)
+
+    def test_theta(self):
+        """
+        Tests the property theta.
+        """
+        thetas = np.log(np.array([self.weight, self.noise_level, self.length_scale]))
+        np.testing.assert_almost_equal(thetas, self.kernel.theta)
+
+        new_thetas = np.array([1.0, 1.0, 1.0])
+        self.kernel.theta = new_thetas
+        np.testing.assert_almost_equal(new_thetas, self.kernel.theta)
+
+    def test_bounds(self):
+        """
+        Tests the property bounds.
+        """
+        np.testing.assert_almost_equal(np.array([
+            np.log(np.array(self.weight_bounds)),
+            np.log(np.array(self.noise_level_bounds)),
+            np.log(np.array(self.length_scale_bounds)),
+        ]), self.kernel.bounds)
+
     def test_separate_X_with_mixed_feature_space(self):
         """
         Tests the method separate_X() with mixed feature space (categorical + continuous).
@@ -67,6 +133,19 @@ class TestCoCaBOKernel(unittest.TestCase):
         X_categorical, X_continuous = self.kernel._separate_X(self.continuous_X)
         self.assertEqual(0, X_categorical.size)
         np.testing.assert_array_almost_equal(self.continuous_X, X_continuous)
+
+    def test_get_params(self):
+        """
+        Tests the method get_params().
+        """
+        params_dict = self.kernel.get_params()
+
+        self.assertEqual(self.noise_level, params_dict["k1__noise_level"])
+        self.assertEqual(self.noise_level_bounds, params_dict["k1__noise_level_bounds"])
+        self.assertEqual(self.length_scale, params_dict["k2__length_scale"])
+        self.assertEqual(self.length_scale_bounds, params_dict["k2__length_scale_bounds"])
+        self.assertEqual(self.weight, params_dict["weight"])
+        self.assertEqual(self.weight_bounds, params_dict["weight_bounds"])
 
     def test_diag_with_mixed_feature_space(self):
         """
