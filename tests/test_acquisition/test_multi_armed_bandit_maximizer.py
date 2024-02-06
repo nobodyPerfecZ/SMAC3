@@ -10,10 +10,10 @@ from smac.model.gaussian_process.kernels import CoCaBOKernel, SimilarityKernel, 
 from smac.utils.configspace import convert_configurations_to_array
 
 
-# --------------------------------------------------------------
-# Test MultiMABMaximizer
-# --------------------------------------------------------------
 class TestMultiMABMaximizer(unittest.TestCase):
+    """
+    Tests the class MultiMABMaximizer.
+    """
 
     def setUp(self):
         # Define ConfigurationSpace, X, y
@@ -29,6 +29,7 @@ class TestMultiMABMaximizer(unittest.TestCase):
         self.configurations = self.cs.sample_configuration(5)
         self.X = convert_configurations_to_array(self.configurations)
         self.y = np.array([1, 1, 2, 2, 4]).reshape(-1, 1)
+        self.previous_configurations = self.cs.sample_configuration(20)
 
         # Initialize and train the model
         self.kernel = CoCaBOKernel(SimilarityKernel(), RBFKernel(), weight=0.5)
@@ -61,7 +62,7 @@ class TestMultiMABMaximizer(unittest.TestCase):
         """
         # Get the next configurations based on the maximizer
         configurations = self.mab_maximizer._maximize(
-            previous_configs=None,
+            previous_configs=self.previous_configurations,
             n_points=10,
             _sorted=False,
         )
@@ -76,7 +77,7 @@ class TestMultiMABMaximizer(unittest.TestCase):
         """
         # Get the next configurations based on the maximizer
         configurations = self.mab_maximizer._maximize(
-            previous_configs=None,
+            previous_configs=self.previous_configurations,
             n_points=10,
             _sorted=True,
         )
@@ -86,7 +87,7 @@ class TestMultiMABMaximizer(unittest.TestCase):
         self.assertTrue(all(cfg["D"] == "d2" for _, cfg in configurations))
 
         # Check if the acquisition function values are in descending order
-        self.assertTrue(all(configurations[i][0] >= configurations[i + 1][0]) for i in range(len(configurations) - 1))
+        self.assertTrue(all(configurations[i][0] >= configurations[i + 1][0] for i in range(len(configurations) - 1)))
 
 
 if __name__ == "__main__":

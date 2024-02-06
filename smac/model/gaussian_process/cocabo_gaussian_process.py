@@ -38,7 +38,7 @@ class CoCaBOGaussianProcess(AbstractGaussianProcess):
     ----------
     configspace : ConfigurationSpace
     kernel : Kernel
-        Kernel which is used for the Gaussian process.
+        The Kernel which is used for the Gaussian process.
     n_restarts : int, defaults to 10
         Number of restarts for the Gaussian process hyperparameter optimization.
     normalize_y : bool, defaults to True
@@ -95,8 +95,7 @@ class CoCaBOGaussianProcess(AbstractGaussianProcess):
         
         # Obtain a list of all priors for each tunable hyperparameter of the kernel
         all_priors = []
-        to_visit = []
-        to_visit.append(self._gp.kernel)
+        to_visit = [self._gp.kernel]
 
         while len(to_visit) > 0:
             current_param = to_visit.pop(0)
@@ -185,7 +184,7 @@ class CoCaBOGaussianProcess(AbstractGaussianProcess):
         ----------
         X : np.ndarray [#samples, #hyperparameters + #features]
             Input data points.
-        Y : np.ndarray [#samples, #objectives]
+        y : np.ndarray [#samples, #objectives]
             The corresponding target values.
         optimize_hyperparameters: boolean
             If set to true, the hyperparameters are optimized, otherwise the default hyperparameters of the kernel are
@@ -228,14 +227,12 @@ class CoCaBOGaussianProcess(AbstractGaussianProcess):
     def _get_gaussian_process(self) -> GaussianProcessRegressor:
         gp = GaussianProcessRegressor(
             kernel=self._kernel,
-            normalize_y=False,  # We do not use scikit-learn's normalize routine
+            normalize_y=False,
             optimizer=None,
-            n_restarts_optimizer=0,  # We do not use scikit-learn's optimization routine
-            alpha=1e-10, #  0,  # Governed by the kernel
+            n_restarts_optimizer=0,
+            alpha=1e-10,
             random_state=self._rng,
         )
-        # Remove _validate_data from gaussian process
-        # gp._validate_data = lambda X, y, multi_output, y_numeric, ensure_2d, dtype : (X, y)
         return gp
 
     def _nll(self, theta: np.ndarray) -> tuple[float, np.ndarray]:

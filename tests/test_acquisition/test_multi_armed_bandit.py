@@ -9,10 +9,10 @@ from smac.model.gaussian_process.kernels import CoCaBOKernel, SimilarityKernel, 
 from smac.utils.configspace import convert_configurations_to_array
 
 
-# --------------------------------------------------------------
-# Test MultiMAB
-# --------------------------------------------------------------
 class TestMultiMAB(unittest.TestCase):
+    """
+    Tests the class MultiMAB.
+    """
 
     def setUp(self):
         # Define ConfigurationSpace, X, y
@@ -61,7 +61,14 @@ class TestMultiMAB(unittest.TestCase):
             self.mabs.update(model=self.model, X=self.X, Y=self.y)
 
         np.testing.assert_almost_equal(np.array([0.7385973, 0.2059689, 0.0737037, 0.4592286]), self.mabs[0]._weights)
-        np.testing.assert_almost_equal(np.array([0.504676 , 0.0903069, 0.1378248]), self.mabs[1]._weights)
+        np.testing.assert_almost_equal(np.array([0.504676, 0.0903069, 0.1378248]), self.mabs[1]._weights)
+
+    def test_get_hp_values(self):
+        """
+        Tests the method get_hp_values().
+        """
+        hp_values = self.mabs.get_hp_values(np.array([[2, 1]]))
+        np.testing.assert_equal(np.array([["c3", "d2"]]), hp_values)
 
     def test_call(self):
         """
@@ -71,18 +78,24 @@ class TestMultiMAB(unittest.TestCase):
         indices = self.mabs([self.configurations[0]])
         np.testing.assert_almost_equal(np.array([[2, 1]]), indices)
 
-    def test_get_hp_values(self):
+    def test_len(self):
         """
-        Tests the method get_hp_values().
+        Tests the magic method __len__().
         """
-        hp_values = self.mabs.get_hp_values(np.array([[2, 1]]))
-        np.testing.assert_equal(np.array([["c3", "d2"]]), hp_values)
+        self.assertEqual(2, len(self.mabs))
+
+    def test_iter(self):
+        """
+        Tests the magic method __iter__().
+        """
+        for mab in self.mabs:
+            self.assertIsInstance(mab, MAB)
 
 
-# --------------------------------------------------------------
-# Test MAB
-# --------------------------------------------------------------
 class TestMAB(unittest.TestCase):
+    """
+    Tests  the class MAB
+    """
 
     def setUp(self):
         # Define ConfigurationSpace, X, y
