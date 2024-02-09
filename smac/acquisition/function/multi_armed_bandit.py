@@ -42,14 +42,16 @@ class MultiMAB(AbstractAcquisitionFunction):
     ):
         super(MultiMAB, self).__init__()
         self._configspace = configspace
-
+        self._rng = np.random.RandomState(seed)
         # Initialize the MABs
         self._multi_mab = []
         for i, hp in enumerate(self._configspace.values()):
             if isinstance(hp, CategoricalHyperparameter):
-                self._multi_mab.append(MAB(index=i, K=len(hp.choices), gamma=gamma, seed=seed))
+                new_seed = self._rng.randint(0, int(1e7))
+                self._multi_mab.append(MAB(index=i, K=len(hp.choices), gamma=gamma, seed=new_seed))
             elif isinstance(hp, OrdinalHyperparameter):
-                self._multi_mab.append(MAB(index=i, K=len(hp.sequence), gamma=gamma, seed=seed))
+                new_seed = self._rng.randint(0, int(1e7))
+                self._multi_mab.append(MAB(index=i, K=len(hp.sequence), gamma=gamma, seed=new_seed))
 
     @property
     def name(self) -> str:
