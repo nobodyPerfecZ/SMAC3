@@ -66,12 +66,12 @@ class MultiMAB(AbstractAcquisitionFunction):
 
         Parameters
         ----------
-        actions : np.ndarray [1, NUM_MABS]
-            The actions for each MAB as indices.
+        actions : np.ndarray [NUM_CFGS, NUM_MABS]
+            The actions for each MAB as indices
 
         Returns
         -------
-        np.ndarray [1, NUM_MABS]
+        np.ndarray [NUM_CFGS, NUM_MABS]
             The corresponding values of each categorical hyperparameter
         """
         if actions.shape[1] != len(self._multi_mab):
@@ -95,7 +95,7 @@ class MultiMAB(AbstractAcquisitionFunction):
         # Select only the categorical values of each MAB
         X = convert_configurations_to_array(configurations)[:, indices]
 
-        # Reshape from (1,) to (1, 1)
+        # Reshape from (NUM_MABS) to (1, NUM_MABS)
         if len(X.shape) == 1:
             X = X[np.newaxis, :]
 
@@ -107,6 +107,9 @@ class MultiMAB(AbstractAcquisitionFunction):
         return acq
 
     def _compute(self, X: np.ndarray) -> np.ndarray:
+        if X.shape[1] != len(self._multi_mab):
+            raise ValueError("MultiMAB only support _compute(...) with shape (NUM_CFGS, NUM_MABS)!")
+
         # Sample for the given input
         next_actions = np.zeros(shape=X.shape, dtype=int)
 
@@ -179,7 +182,7 @@ class MAB(AbstractAcquisitionFunction):
         # 1. Initialize the weights w_i(1) = 1 for i = 1, ..., K
         self._weights = np.array([1.0 for _ in range(K)])
 
-        # Initialize the last action
+        # Tracks which configurations has been observed
         self._history = 0
 
     @property
@@ -278,6 +281,9 @@ class MAB(AbstractAcquisitionFunction):
         return acq
 
     def _compute(self, X: np.ndarray) -> np.ndarray:
+        if X.shape[1] != 1:
+            raise ValueError("MAB only support _compute(...) with shape (NUM_CFGS, 1)!")
+
         # EXP3:
         # 2.2 Draw the next action i_t (as index) according to the distribution of p_i(t)
         next_action = self._rng.choice(self._K, size=X.shape, p=self._prob, replace=True)
