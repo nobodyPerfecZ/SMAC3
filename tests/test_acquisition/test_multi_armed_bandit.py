@@ -52,31 +52,46 @@ class TestMultiMAB(unittest.TestCase):
         # Train the model beforehand
         self.model.train(self.X, self.y)
 
-        # Update the mabs 10x times with different last actions
-        for _ in range(10):
-            # Use the mab for the first time
-            self.mabs([self.configurations[0]])
+        # Update the mab
+        self.mabs.update(model=self.model, X=self.X, Y=self.y)
 
-            # Update the mab
-            self.mabs.update(model=self.model, X=self.X, Y=self.y)
-
-        np.testing.assert_almost_equal(np.array([0.7385973, 0.2059689, 0.0737037, 0.4592286]), self.mabs[0]._weights)
-        np.testing.assert_almost_equal(np.array([0.504676, 0.0903069, 0.1378248]), self.mabs[1]._weights)
+        np.testing.assert_almost_equal(np.array([0.61864039, 1., 0.84648172, 0.8492465]), self.mabs[0]._weights)
+        np.testing.assert_almost_equal(np.array([1., 1., 0.40542698]), self.mabs[1]._weights)
 
     def test_get_hp_values(self):
         """
         Tests the method get_hp_values().
         """
-        hp_values = self.mabs.get_hp_values(np.array([[2, 1]]))
-        np.testing.assert_equal(np.array([["c3", "d2"]]), hp_values)
+        hp_values = self.mabs.get_hp_values(
+            actions=np.array([
+                [2, 1],
+                [0, 0],
+                [1, 2],
+                [3, 2],
+                [3, 0],
+            ])
+        )
+        np.testing.assert_equal(np.array([
+            ["c3", "d2"],
+            ["c1", "d1"],
+            ["c2", "d3"],
+            ["c4", "d3"],
+            ["c4", "d1"],
+        ]), hp_values)
 
     def test_call(self):
         """
         Tests the magic method __call__().
         """
         # Compute the index of the next configuration
-        indices = self.mabs([self.configurations[0]])
-        np.testing.assert_almost_equal(np.array([[2, 1]]), indices)
+        indices = self.mabs(self.configurations)
+        np.testing.assert_almost_equal(np.array([
+            [1, 2],
+            [2, 0],
+            [3, 2],
+            [0, 1],
+            [3, 1],
+        ]), indices)
 
     def test_len(self):
         """
@@ -149,22 +164,24 @@ class TestMAB(unittest.TestCase):
         # Train the model first
         self.model.train(self.X, self.y)
 
-        # Update the mab 10x times with different last actions
-        for _ in range(10):
-            # Use the mab for the first time
-            self.mab([self.configurations[0]])
+        # Update the mab
+        self.mab.update(model=self.model, X=self.X, Y=self.y)
 
-            # Update the mab
-            self.mab.update(model=self.model, X=self.X, Y=self.y)
-        np.testing.assert_almost_equal(np.array([0.7385973, 0.2059689, 0.0737037, 0.4592286]), self.mab._weights)
+        np.testing.assert_almost_equal(np.array([0.61864039, 1., 0.84648172, 0.8492465]), self.mab._weights)
 
     def test_call(self):
         """
         Tests the magic method __call__().
         """
         # Compute the index of the next configuration
-        index = self.mab([self.configurations[0]])
-        np.testing.assert_almost_equal(np.array([2]), index)
+        indices = self.mab(self.configurations)
+        np.testing.assert_almost_equal(np.array([
+            [2],
+            [2],
+            [2],
+            [2],
+            [1],
+        ]), indices)
 
 
 if __name__ == "__main__":

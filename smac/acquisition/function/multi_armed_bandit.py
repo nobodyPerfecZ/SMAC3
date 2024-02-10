@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import warnings
 from typing import Any, Iterator
 
 import numpy as np
@@ -62,7 +61,8 @@ class MultiMAB(AbstractAcquisitionFunction):
             mab.update(model=model, X=X, Y=Y, **kwargs)
 
     def get_hp_values(self, actions: np.ndarray) -> np.ndarray:
-        """Returns the corresponding hyperparameter values, given the actions as indices for each hyperparameter value.
+        """
+        Returns the corresponding hyperparameter values, given the actions as indices for each hyperparameter value.
 
         Parameters
         ----------
@@ -74,30 +74,28 @@ class MultiMAB(AbstractAcquisitionFunction):
         np.ndarray [1, NUM_MABS]
             The corresponding values of each categorical hyperparameter
         """
-        if actions.shape != (1, len(self._multi_mab)):
-            raise ValueError("MultiMAB only support get_hp_values(...) with shape (1, NUM_MABS)!")
+        if actions.shape[1] != len(self._multi_mab):
+            raise ValueError("MultiMAB only support get_hp_values(...) with shape (NUM_CFGS, NUM_MABS)!")
 
         # Get the categorical values for each categorical hyperparameter
-        hp_values = np.zeros(shape=(1, len(self._multi_mab)), dtype=object)
-        for i, mab in enumerate(self._multi_mab):
-            hp = list(self._configspace.values())[mab.index]
-            if isinstance(hp, OrdinalHyperparameter):
-                hp_values[0, i] = hp.sequence[actions[0, i]]
-            elif isinstance(hp, CategoricalHyperparameter):
-                hp_values[0, i] = hp.choices[actions[0, i]]
+        hp_values = np.zeros(shape=actions.shape, dtype=object)
+        for i, action in enumerate(actions):
+            for j, mab in enumerate(self._multi_mab):
+                hp = list(self._configspace.values())[mab.index]
+                if isinstance(hp, OrdinalHyperparameter):
+                    hp_values[i, j] = hp.sequence[action[j]]
+                elif isinstance(hp, CategoricalHyperparameter):
+                    hp_values[i, j] = hp.choices[action[j]]
         return hp_values
 
     def __call__(self, configurations: list[Configuration]) -> np.ndarray:
-        if len(configurations) != 1:
-            raise ValueError("MultiMAB only support __call__(...) with shape (1, N)!")
-
         # Get the indices of each MAB
         indices = [mab.index for mab in self._multi_mab]
 
         # Select only the categorical values of each MAB
         X = convert_configurations_to_array(configurations)[:, indices]
 
-        # Reshape from (NUM_MABS,) to (1, NUM_MABS)
+        # Reshape from (1,) to (1, 1)
         if len(X.shape) == 1:
             X = X[np.newaxis, :]
 
@@ -109,23 +107,13 @@ class MultiMAB(AbstractAcquisitionFunction):
         return acq
 
     def _compute(self, X: np.ndarray) -> np.ndarray:
-        if X.shape != (1, len(self._multi_mab)):
-            raise ValueError("MultiMAB only support _compute(...) with shape (1, NUM_MABS)!")
-
         # Sample for the given input
         next_actions = np.zeros(shape=X.shape, dtype=int)
 
         # Sample for each mab
         for i, mab in enumerate(self._multi_mab):
-            # Select the corresponding categorical value for the given MAB
-            x = X[:, i]
-
-            # Reshape from (1,) to (1, 1)
-            if x.ndim == 1:
-                x = x[np.newaxis, :]
-
             # Sample the next action from the MAB
-            next_actions[:, i] = mab._compute(x)
+            next_actions[:, i] = mab._compute(X[:, i, np.newaxis]).reshape(-1)
 
         return next_actions
 
@@ -192,8 +180,7 @@ class MAB(AbstractAcquisitionFunction):
         self._weights = np.array([1.0 for _ in range(K)])
 
         # Initialize the last action
-        self._last_action = -1
-        self._first_time = True
+        self._history = 0
 
     @property
     def name(self) -> str:
@@ -248,43 +235,39 @@ class MAB(AbstractAcquisitionFunction):
         return probs
 
     def _update(self, **kwargs: Any) -> None:
-        if self._last_action == -1 and not self._first_time:
-            # Case: Last actions was not set correctly (and it is not the first time)
-            warnings.warn(
-                "Use __call__(...) to set the last action before updating the weights of the MAB!",
-                UserWarning
-            )
-            return
-
-        # Set first_time to False
-        self._first_time = False
-
         # EXP3:
         # 2.3. Observe reward x_i_t(t)
         # Because the range of the value can be [-inf, +inf] we perform a min-max normalization to scale it to [0, 1]
-        reward = MinMaxScaler().fit_transform(self.Y)[-1].item()
+        rewards = MinMaxScaler().fit_transform(self.Y).reshape(-1)
 
-        # EXP3:
-        # 2.4. Define the estimated reward x^_i_t(t) = x_i_t(t) / p_i_t(t)
-        estimated_reward = reward / max(1e-10, self._prob[self._last_action])
+        for t in range(self._history, self.X.shape[0]):
+            # EXP3:
+            # 2.3. Observe reward x_i_t(t)
+            # Get the action and reward from configuration t
+            action = int(self.X[t, self._index])
+            reward = float(rewards[t])
 
-        # EXP3:
-        # 2.5.: Update weights w_i_t(t+1) = w_i_t(t) * exp(gamma * x^_i_t(t) / K)
-        # Because we have a minimization problem we use -x^_i_t(t) for the update
-        self._weights[self._last_action] = (
-                self._weights[self._last_action] * np.exp(-self._gamma * estimated_reward / self._K)
-        )
+            # EXP3:
+            # 2.4. Define the estimated reward x^_i_t(t) = x_i_t(t) / p_i_t(t)
+            estimated_reward = reward / max(1e-10, self._prob[action])
+
+            # EXP3:
+            # 2.5.: Update weights w_i_t(t+1) = w_i_t(t) * exp(gamma * x^_i_t(t) / K)
+            # Because we have a minimization problem we use -x^_i_t(t) for the update
+            self._weights[action] = (
+                    self._weights[action] * np.exp(-self._gamma * estimated_reward / self._K)
+            )
+    
+        # Update history
+        self._history = len(self.X)
 
     def __call__(self, configurations: list[Configuration]) -> np.ndarray:
-        if len(configurations) != 1:
-            raise ValueError("MAB only support __call__(...) with shape (1, N)!")
-
         # Get the value of the categorical hyperparameter
         X = convert_configurations_to_array(configurations)[:, self._index]
 
-        # Adjust from shape (1,) to (1, 1)
+        # Adjust from shape (N,) to (N, 1)
         if len(X.shape) == 1:
-            X = X[np.newaxis, :]
+            X = X[:, np.newaxis]
         
         # Compute the acquisition values (indices of next actions)
         acq = self._compute(X)
@@ -295,16 +278,9 @@ class MAB(AbstractAcquisitionFunction):
         return acq
 
     def _compute(self, X: np.ndarray) -> np.ndarray:
-        if X.shape != (1, 1):
-            raise ValueError("MAB only support _compute(...) with shape (1, 1)!")
-
         # EXP3:
         # 2.2 Draw the next action i_t (as index) according to the distribution of p_i(t)
-        next_action = self._rng.choice(self._K, size=X.shape[0], p=self._prob)
-
-        # Update last action to the current index
-        self._last_action = next_action.item()
-
+        next_action = self._rng.choice(self._K, size=X.shape, p=self._prob, replace=True)
         return next_action
 
     def __str__(self) -> str:

@@ -48,7 +48,7 @@ class AbstractAcquisitionFunction:
         self._model = model
         
     @property
-    def X(self) -> np.ndarray | None:
+    def X(self) -> np.ndarray:
         """Returns the evaluated feature matrix."""
         return self._X
 
@@ -58,7 +58,7 @@ class AbstractAcquisitionFunction:
         self._X = X
     
     @property
-    def Y(self) -> np.ndarray | None:
+    def Y(self) -> np.ndarray:
         """Returns the evaluated costs."""
         return self._Y
 

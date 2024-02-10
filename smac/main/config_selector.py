@@ -203,7 +203,7 @@ class ConfigSelector:
                     eta=best_observation,
                     incumbent_array=x_best_array,
                     num_data=len(self._get_evaluated_configs()),
-                    X=X_configurations,
+                    X=X,
                     Y=Y,
                 )
 

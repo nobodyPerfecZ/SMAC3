@@ -111,17 +111,17 @@ class MultiMABMaximizer(AbstractAcquisitionMaximizer):
             )
 
             # Select the next values for each categorical hyperparameter
-            next_actions = self._mabs([self._configspace.sample_configuration()])
+            next_actions = self._mabs(next_configs_by_random_search)
             hp_values = self._mabs.get_hp_values(next_actions)
-            
+
             # Get the categorical hyperparameter names from the configuration space
             hp_names = list(self._configspace.keys())
             hp_names = [hp_names[mab.index] for mab in self._mabs]
 
             # Replace the categorical hyperparameter with the MAB ones
-            for cfg in next_configs_by_random_search:
+            for cfg, hp_value in zip(next_configs_by_random_search, hp_values):
                 for i, name in enumerate(hp_names):
-                    cfg[name] = hp_values[0][i]
+                    cfg[name] = hp_value[i]
 
         if _sorted:
             # Case: Sort them by the acquisition function values
